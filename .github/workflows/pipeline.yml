@@ -18,22 +18,60 @@ jobs:
           node-version: '24'
       - name: Install dependencies
         run: npm install
+
       - name: Check style
         run: npm run eslint
+
       - name: Run npm test
         run: npm run test
+
       - name: Run npm build
         run: npm run build
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
+
       - name: Run Playwright tests
         run: npm run test:e2e
+
       - if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
         uses: superfly/flyctl-actions/setup-flyctl@master
+
       - if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
         run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          
+      - name: Deployment successful notification
+        if: ${{ success() && github.event_name == 'push' && !contains(join(github.event.commits.*.message, ' '), '#skip') }}
+        uses: sarisia/actions-status-discord@v1
+        with: 
+          content: "✅ **Deployment Successful!** A new version deployed to production"
+          title: "Deployment Details"
+          description: |
+            **Commit:** ${{ github.sha }}
+            **Message:** ${{ join(github.event.commits.*.message, ' ') }}
+            **Actor:** ${{ github.actor }}
+
+      - name: Build failure notification
+        if: ${{ failure() }}
+        uses: sarisia/actions-status-discord@v1
+        with: 
+          content: "❌ **Build Failed!** The pipeline encountered an error"
+          title: "Failure Details"
+          description: |
+            **Repository:** ${{ github.repository }}
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Message:** ${{ join(github.event.commits.*.message, ' ') }}
+            **Actor:** ${{ github.actor }}
+            **Workflow**: ${{ github.workflow }}
+            **Job**: ${{ github.job }}
+            
+            [View Commit](${{ github.server_url }}/${{ github.repository }}/commits/${{ github.sha }})
+            [View Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+
   tag_release:
     needs: [deployment_pipeline]
     runs-on: ubuntu-latest
